@@ -1,0 +1,33 @@
+# Development Environment Configuration
+salesforce:
+  username: "dev-user@company.com"
+  password: "dev-password"
+  securityToken: "dev-security-token"
+  url: "https://test.salesforce.com/services/Soap/u/58.0"
+  timeout: 30000
+  
+file:
+  input:
+    directory: "src/main/resources/input"
+    pattern: "*.json,*.csv"
+    autoDelete: false
+  processed:
+    directory: "src/main/resources/processed"
+  error:
+    directory: "src/main/resources/error"
+
+batch:
+  size: 200
+  timeout: 300000
+
+logging:
+  level: "DEBUG"
+  
+retry:
+  maxAttempts: 3
+  delay: 5000
+
+api:
+  host: "0.0.0.0"
+  port: 8081
+  basePath: "/api/v1"

@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+    <munit:config name="account-upsert-test-suite.xml" />
+
+    <!-- Test Data Setup -->
+    <munit:before-suite name="before-suite" description="Setup test data">
+        <ee:transform doc:name="Setup Test Account Data" doc:id="setup-test-data">
+            <ee:message>
+                <ee:set-payload resource="dwl/test-data.dwl"/>
+            </ee:message>
+            <ee:variables>
+                <ee:set-variable variableName="testAccountData"><![CDATA[%dw 2.0
+                output application/json
+                ---
+                [
+                    {
+                        "Name": "Test Account 1",
+                        "hc_integration_key": "TEST001",
+                        "Type": "Customer",
+                        "Industry": "Technology",
+                        "Phone": "+1-555-TEST-001",
+                        "Website": "https://www.testaccount1.com",
+                        "BillingStreet": "123 Test Street",
+                        "BillingCity": "Test City",
+                        "BillingState": "TS",
+                        "BillingPostalCode": "12345",
+                        "BillingCountry": "USA",
+                        "AnnualRevenue": 1000000,
+                        "NumberOfEmployees": 50,
+                        "Description": "Test account for MUnit testing"
+                    }
+                ]]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+    </munit:before-suite>
+
+    <!-- Positive Test Case: Successful Account Upsert -->
+    <munit:test name="test-successful-account-upsert" description="Test successful account upsert operation" doc:id="test-successful-upsert">
+        
+        <munit:behavior>
+            <munit-tools:mock-when doc:name="Mock Salesforce Upsert Success" doc:id="mock-sf-upsert-success" processor="salesforce:upsert">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute whereValue="Account" attributeName="objectType"/>
+                    <munit-tools:with-attribute whereValue="hc_integration_key__c" attributeName="externalIdFieldName"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "id": "0011234567890ABC",
+                        "success": true,
+                        "created": true,
+                        "errors": []
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+
+        <munit:execution>
+            <ee:transform doc:name="Set Test Payload" doc:id="set-test-payload">
+                <ee:message>
+                    <ee:set-payload><![CDATA[#[vars.testAccountData]]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            
+            <flow-ref doc:name="Call Account Upsert Flow" doc:id="call-account-upsert" name="accountUpsertFlow"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that doc:name="Assert Payload Not Null" doc:id="assert-payload-not-null" expression="#[payload]" is="#[MunitTools::notNullValue()]"/>
+            
+            <munit-tools:assert-that doc:name="Assert Success Response" doc:id="assert-success-response" expression="#[payload[0].success]" is="#[MunitTools::equalTo(true)]"/>
+            
+            <munit-tools:assert-that doc:name="Assert Record Created" doc:id="assert-record-created" expression="#[payload[0].created]" is="#[MunitTools::equalTo(true)]"/>
+            
+            <munit-tools:assert-that doc:name="Assert ID Present" doc:id="assert-id-present" expression="#[payload[0].id]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- Positive Test Case: Account Update (Existing Record) -->
+    <munit:test name="test-successful-account-update" description="Test successful account update operation" doc:id="test-successful-update">
+        
+        <munit:behavior>
+            <munit-tools:mock-when doc:name="Mock Salesforce Upsert Update" doc:id="mock-sf-upsert-update" processor="salesforce:upsert">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute whereValue="Account" attributeName="objectType"/>
+                    <munit-tools:with-attribute whereValue="hc_integration_key__c" attributeName="externalIdFieldName"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload value='#[[{
+                        "id": "0011234567890ABC",
+                        "success": true,
+                        "created": false,
+                        "errors": []
+                    }]]'/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+
+        <munit:execution>
+            <ee:transform doc:name="Set Update Test Payload" doc:id="set-update-test-payload">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+                    output application/json
+                    ---
+                    [
+                        {
+                            "Name": "Updated Test Account 1",
+                            "hc_integration_key": "TEST001",
+                            "Type": "Partner",
+                            "Industry": "Technology",
+                            "Phone": "+1-555-TEST-UPD",
+                            "Website": "https://www.updatedtestaccount1.com",
+                            "BillingStreet": "456 Updated Street",
+                            "BillingCity": "Updated City",
+                            "BillingState": "UP",
+                            "BillingPostalCode": "54321",
+                            "BillingCountry": "USA",
+                            "AnnualRevenue": 2000000,
+                            "NumberOfEmployees": 100,
+                            "Description": "Updated test account for MUnit testing"
+                        }
+                    ]]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            
+            <flow-ref doc:name="Call Account Upsert Flow" doc:id="call-account-upsert-update" name="accountUpsertFlow"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that doc:name="Assert Payload Not Null" doc:id="assert-update-payload-not-null" expression="#[payload]" is="#[MunitTools::notNullValue()]"/>
+            
+            <munit-tools:assert-that doc:name="Assert Success Response" doc:id="assert-update-success-response" expression="#[payload[0].success]" is="#[MunitTools::equalTo(true)]"/>
+            
+            <munit-tools:assert-that doc:name="Assert Record Updated" doc:id="assert-record-updated" expression="#[payload[0].created]" is="#[MunitTools::equalTo(false)]"/>
+            
+            <munit-tools:assert-that doc:name="Assert ID Present" doc:id="assert-update-id-present" expression="#[payload[0].id]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- Negative Test Case: Salesforce Connection Error -->
+    <munit:test name="test-salesforce-connection-error" description="Test Salesforce connection error handling" doc:id="test-sf-connection-error">
+        
+        <munit:behavior>
+            <munit-tools:mock-when doc:name="Mock Salesforce Connection Error" doc:id="mock-sf-connection-error" processor="salesforce:upsert">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute whereValue="Account" attributeName="objectType"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:error typeId="SALESFORCE:CONNECTIVITY"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+
+        <munit:execution>
+            <ee:transform doc:name="Set Test Payload" doc:id="set-error-test-payload">
+                <ee:message>
+                    <ee:set-payload><![CDATA[#[vars.testAccountData]]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            
+            <try doc:name="Try" doc:id="try-upsert-error">
+                <flow-ref doc:name="Call Account Upsert Flow" doc:id="call-account-upsert-error" name="accountUpsertFlow"/>
+                <error-handler>
+                    <on-error-continue doc:name="On Error Continue" doc:id="on-error-continue-test" type="ANY">
+                        <set-variable value="#[error.errorType.identifier]" doc:name="Set Error Type" doc:id="set-error-type" variableName="errorType"/>
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that doc:name="Assert Error Occurred" doc:id="assert-error-occurred" expression="#[vars.errorType]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- Negative Test Case: Invalid Data Format -->
+    <munit:test name="test-invalid-data-format" description="Test invalid data format handling" doc:id="test-invalid-data-format">
+        
+        <munit:execution>
+            <ee:transform doc:name="Set Invalid Payload" doc:id="set-invalid-payload">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+                    output application/json
+                    ---
+                    [
+                        {
+                            "InvalidField": "Invalid Value",
+                            "MissingRequiredField": null
+                        }
+                    ]]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            
+            <try doc:name="Try Invalid Data" doc:id="try-invalid-data">
+                <flow-ref doc:name="Call Account Upsert Flow" doc:id="call-account-upsert-invalid" name="accountUpsertFlow"/>
+                <error-handler>
+                    <on-error-continue doc:name="On Error Continue" doc:id="on-error-continue-invalid" type="ANY">
+                        <set-variable value="#[error.description]" doc:name="Set Error Description" doc:id="set-error-description" variableName="errorDescription"/>
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that doc:name="Assert Error Description" doc:id="assert-error-description" expression="#[vars.errorDescription]" is="#[MunitTools::notNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- Test Data Transformation -->
+    <munit:test name="test-data-transformation" description="Test DataWeave transformation" doc:id="test-data-transformation">
+        
+        <munit:execution>
+            <ee:transform doc:name="Set Raw Data" doc:id="set-raw-data">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+                    output application/json
+                    ---
+                    [
+                        {
+                            "name": "Test Company",
+                            "integration_key": "TEST123",
+                            "type": "Customer",
+                            "phone": "+1-555-123-4567"
+                        }
+                    ]]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            
+            <ee:transform doc:name="Apply Account Mapping" doc:id="apply-account-mapping">
+                <ee:message>
+                    <ee:set-payload resource="dwl/account-mapping.dwl"/>
+                </ee:message>
+            </ee:transform>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that doc:name="Assert Name Mapped" doc:id="assert-name-mapped" expression="#[payload[0].Name]" is="#[MunitTools::equalTo('Test Company')]"/>
+            
+            <munit-tools:assert-that doc:name="Assert External ID Mapped" doc:id="assert-external-id-mapped" expression="#[payload[0].hc_integration_key__c]" is="#[MunitTools::equalTo('TEST123')]"/>
+            
+            <munit-tools:assert-that doc:name="Assert Type Mapped" doc:id="assert-type-mapped" expression="#[payload[0].Type]" is="#[MunitTools::equalTo('Customer')]"/>
+            
+            <munit-tools:assert-that doc:name="Assert Phone Mapped" doc:id="assert-phone-mapped" expression="#[payload[0].Phone]" is="#[MunitTools::equalTo('+1-555-123-4567')]"/>
+        </munit:validation>
+    </munit:test>
+
+</mule>

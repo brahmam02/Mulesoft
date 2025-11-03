@@ -1,0 +1,4 @@
+Name,hc_integration_key,Type,Industry,Phone,Website,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,AnnualRevenue,NumberOfEmployees,Description
+"Enterprise Solutions Ltd","ENT004","Customer","Consulting","+1-555-111-2222","https://www.enterprisesolutions.com","100 Business Park","New York","NY","10001","USA",8000000,150,"Leading enterprise consulting firm"
+"Innovation Labs","INNOV005","Partner","Research","+1-555-333-4444","https://www.innovationlabs.com","200 Research Way","Boston","MA","02101","USA",3000000,75,"Cutting-edge research and development company"
+"Digital Transform Co","DIGIT006","Prospect","Technology","+1-555-555-6666","https://www.digitaltransform.com","300 Tech Avenue","Seattle","WA","98101","USA",12000000,300,"Digital transformation specialists"

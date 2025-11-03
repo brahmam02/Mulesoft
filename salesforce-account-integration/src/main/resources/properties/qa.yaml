@@ -1,0 +1,33 @@
+# QA Environment Configuration
+salesforce:
+  username: "qa-user@company.com"
+  password: "qa-password"
+  securityToken: "qa-security-token"
+  url: "https://test.salesforce.com/services/Soap/u/58.0"
+  timeout: 45000
+  
+file:
+  input:
+    directory: "src/main/resources/input"
+    pattern: "*.json,*.csv"
+    autoDelete: true
+  processed:
+    directory: "src/main/resources/processed"
+  error:
+    directory: "src/main/resources/error"
+
+batch:
+  size: 500
+  timeout: 600000
+
+logging:
+  level: "INFO"
+  
+retry:
+  maxAttempts: 5
+  delay: 10000
+
+api:
+  host: "0.0.0.0"
+  port: 8082
+  basePath: "/api/v1"

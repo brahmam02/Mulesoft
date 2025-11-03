@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+    <!-- File Processing Flow -->
+    <flow name="fileProcessingFlow" doc:id="file-processing-flow">
+        <file:listener doc:name="File Listener" doc:id="file-listener" 
+                      config-ref="File_Config" 
+                      directory="${file.input.directory}" 
+                      matcher="${file.input.pattern}"
+                      autoDelete="${file.input.autoDelete}">
+            <scheduling-strategy>
+                <fixed-frequency frequency="30000"/>
+            </scheduling-strategy>
+        </file:listener>
+        
+        <set-variable value="#[attributes.fileName]" doc:name="Set fileName" doc:id="set-filename" variableName="fileName"/>
+        <set-variable value="#[uuid()]" doc:name="Set correlationId" doc:id="set-correlation-id" variableName="correlationId"/>
+        
+        <logger level="INFO" doc:name="Start Processing" doc:id="start-processing-logger" 
+                message="Starting file processing for: #[vars.fileName] with correlationId: #[vars.correlationId]"/>
+        
+        <flow-ref doc:name="Account Upsert Flow" doc:id="account-upsert-flow-ref" name="accountUpsertFlow"/>
+        
+        <file:move doc:name="Move to Processed" doc:id="move-to-processed" 
+                   config-ref="File_Config"
+                   sourcePath="#[vars.fileName]" 
+                   targetPath="${file.processed.directory}/#[vars.fileName]"/>
+        
+        <logger level="INFO" doc:name="Processing Complete" doc:id="processing-complete-logger" 
+                message="File processing completed successfully for: #[vars.fileName]"/>
+        
+        <error-handler>
+            <on-error-propagate doc:name="On Error Propagate" doc:id="file-error-handler" type="ANY">
+                <file:move doc:name="Move to Error" doc:id="move-to-error" 
+                           config-ref="File_Config"
+                           sourcePath="#[vars.fileName]" 
+                           targetPath="${file.error.directory}/#[vars.fileName]"/>
+                <logger level="ERROR" doc:name="Error Logger" doc:id="file-error-logger" 
+                        message="Error processing file #[vars.fileName]: #[error.description]"/>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+    <!-- HTTP API Flow -->
+    <flow name="accountUpsertApiFlow" doc:id="account-upsert-api-flow">
+        <http:listener doc:name="HTTP Listener" doc:id="http-listener" 
+                      config-ref="HTTP_Listener_config" 
+                      path="${api.basePath}/accounts/upsert"/>
+        
+        <set-variable value="#[uuid()]" doc:name="Set correlationId" doc:id="api-set-correlation-id" variableName="correlationId"/>
+        
+        <logger level="INFO" doc:name="API Request" doc:id="api-request-logger" 
+                message="API request received with correlationId: #[vars.correlationId]"/>
+        
+        <flow-ref doc:name="Account Upsert Flow" doc:id="api-account-upsert-flow-ref" name="accountUpsertFlow"/>
+        
+        <ee:transform doc:name="Success Response" doc:id="success-response-transform">
+            <ee:message>
+                <ee:set-payload resource="dwl/success-response.dwl"/>
+            </ee:message>
+        </ee:transform>
+        
+        <error-handler>
+            <on-error-propagate doc:name="On Error Propagate" doc:id="api-error-handler" type="ANY">
+                <ee:transform doc:name="Error Response" doc:id="error-response-transform">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+                        output application/json
+                        ---
+                        {
+                            timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"},
+                            correlationId: vars.correlationId,
+                            error: {
+                                code: error.errorType.identifier,
+                                message: error.description,
+                                details: error.detailedDescription
+                            },
+                            status: "FAILED"
+                        }]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                <logger level="ERROR" doc:name="API Error Logger" doc:id="api-error-logger" 
+                        message="API error for correlationId #[vars.correlationId]: #[error.description]"/>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+    <!-- Main Account Upsert Flow -->
+    <flow name="accountUpsertFlow" doc:id="account-upsert-flow">
+        <try doc:name="Try" doc:id="account-upsert-try">
+            
+            <!-- Data Validation -->
+            <choice doc:name="File Type Choice" doc:id="file-type-choice">
+                <when expression="#[payload.^mimeType contains 'csv']">
+                    <ee:transform doc:name="CSV to JSON" doc:id="csv-to-json-transform">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+                            output application/json
+                            ---
+                            payload]]></ee:set-payload>
+                        </ee:message>
+                    </ee:transform>
+                </when>
+                <otherwise>
+                    <logger level="DEBUG" doc:name="JSON Input" doc:id="json-input-logger" message="Processing JSON input"/>
+                </otherwise>
+            </choice>
+            
+            <set-variable value="#[sizeOf(payload)]" doc:name="Set Record Count" doc:id="set-record-count" variableName="recordCount"/>
+            
+            <logger level="INFO" doc:name="Record Count" doc:id="record-count-logger" 
+                    message="Processing #[vars.recordCount] records"/>
+            
+            <!-- Data Transformation -->
+            <ee:transform doc:name="Transform to Salesforce Format" doc:id="transform-to-sf-format">
+                <ee:message>
+                    <ee:set-payload resource="dwl/account-mapping.dwl"/>
+                </ee:message>
+            </ee:transform>
+            
+            <!-- Batch Processing -->
+            <foreach doc:name="Batch Process" doc:id="batch-process" batchSize="${batch.size}">
+                <try doc:name="Batch Try" doc:id="batch-try">
+                    <salesforce:upsert objectType="Account" 
+                                      externalIdFieldName="hc_integration_key__c" 
+                                      doc:name="Upsert Account" 
+                                      doc:id="upsert-account" 
+                                      config-ref="Salesforce_Config">
+                        <salesforce:records><![CDATA[#[payload]]]></salesforce:records>
+                    </salesforce:upsert>
+                    
+                    <logger level="DEBUG" doc:name="Batch Success" doc:id="batch-success-logger" 
+                            message="Batch upsert successful for #[sizeOf(payload)] records"/>
+                    
+                    <error-handler>
+                        <on-error-continue doc:name="Batch Error Continue" doc:id="batch-error-continue" type="ANY">
+                            <logger level="WARN" doc:name="Batch Error" doc:id="batch-error-logger" 
+                                    message="Batch error: #[error.description] - Continuing with next batch"/>
+                        </on-error-continue>
+                    </error-handler>
+                </try>
+            </foreach>
+            
+            <set-variable value="#[vars.recordCount]" doc:name="Set Processed Count" doc:id="set-processed-count" variableName="processedCount"/>
+            
+            <logger level="INFO" doc:name="Upsert Complete" doc:id="upsert-complete-logger" 
+                    message="Account upsert completed. Processed: #[vars.processedCount] records"/>
+            
+            <error-handler>
+                <on-error-propagate doc:name="On Error Propagate" doc:id="upsert-error-handler" type="ANY">
+                    <logger level="ERROR" doc:name="Upsert Error" doc:id="upsert-error-logger" 
+                            message="Error in account upsert: #[error.description]"/>
+                    <raise-error doc:name="Raise Error" doc:id="raise-upsert-error" type="APP:UPSERT_FAILED" description="#[error.description]"/>
+                </on-error-propagate>
+            </error-handler>
+        </try>
+    </flow>
+
+</mule>

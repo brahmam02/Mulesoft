@@ -1,0 +1,33 @@
+# Production Environment Configuration
+salesforce:
+  username: "prod-username"
+  password: "prod-password"
+  securityToken: "prod-security-token"
+  url: "https://login.salesforce.com/services/Soap/u/58.0"
+  timeout: 60000
+  
+file:
+  input:
+    directory: "/opt/mule/input"
+    pattern: "*.json,*.csv"
+    autoDelete: true
+  processed:
+    directory: "/opt/mule/processed"
+  error:
+    directory: "/opt/mule/error"
+
+batch:
+  size: 1000
+  timeout: 900000
+
+logging:
+  level: "WARN"
+  
+retry:
+  maxAttempts: 3
+  delay: 15000
+
+api:
+  host: "0.0.0.0"
+  port: 8080
+  basePath: "/api/v1"

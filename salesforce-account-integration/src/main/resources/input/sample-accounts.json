@@ -1,0 +1,50 @@
+[
+  {
+    "Name": "Acme Corporation",
+    "hc_integration_key": "ACME001",
+    "Type": "Customer",
+    "Industry": "Technology",
+    "Phone": "+1-555-123-4567",
+    "Website": "https://www.acme.com",
+    "BillingStreet": "123 Main Street",
+    "BillingCity": "San Francisco",
+    "BillingState": "CA",
+    "BillingPostalCode": "94105",
+    "BillingCountry": "USA",
+    "AnnualRevenue": 5000000,
+    "NumberOfEmployees": 250,
+    "Description": "Leading technology company specializing in innovative solutions"
+  },
+  {
+    "Name": "Global Industries Inc",
+    "hc_integration_key": "GLOB002",
+    "Type": "Partner",
+    "Industry": "Manufacturing",
+    "Phone": "+1-555-987-6543",
+    "Website": "https://www.globalindustries.com",
+    "BillingStreet": "456 Industrial Blvd",
+    "BillingCity": "Detroit",
+    "BillingState": "MI",
+    "BillingPostalCode": "48201",
+    "BillingCountry": "USA",
+    "AnnualRevenue": 15000000,
+    "NumberOfEmployees": 500,
+    "Description": "Global manufacturing company with worldwide operations"
+  },
+  {
+    "Name": "Tech Startup LLC",
+    "hc_integration_key": "TECH003",
+    "Type": "Prospect",
+    "Industry": "Software",
+    "Phone": "+1-555-456-7890",
+    "Website": "https://www.techstartup.com",
+    "BillingStreet": "789 Innovation Drive",
+    "BillingCity": "Austin",
+    "BillingState": "TX",
+    "BillingPostalCode": "73301",
+    "BillingCountry": "USA",
+    "AnnualRevenue": 1000000,
+    "NumberOfEmployees": 25,
+    "Description": "Innovative software startup focused on AI solutions"
+  }
+]
